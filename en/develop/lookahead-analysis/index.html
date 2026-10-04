@@ -2080,7 +2080,9 @@ As the analysis can run for a while, it is executed as a background task.</p>
 <span class="go">  -i, --timeframe TIMEFRAME</span>
 <span class="go">                        Specify timeframe (`1m`, `5m`, `30m`, `1h`, `1d`).</span>
 <span class="go">  --timerange TIMERANGE</span>
-<span class="go">                        Specify what timerange of data to use.</span>
+<span class="go">                        Limit action to a specific timerange. Format:</span>
+<span class="go">                        (`yyyymmdd` or `yyyymmddThhmm` - e.g.</span>
+<span class="go">                        `20240101-20240201T1200`).</span>
 <span class="go">  --data-format-ohlcv {json,jsongz,feather,parquet}</span>
 <span class="go">                        Storage format for downloaded candle (OHLCV) data.</span>
 <span class="go">                        (default: `feather`).</span>
@@ -2102,7 +2104,7 @@ As the analysis can run for a while, it is executed as a background task.</p>
 <span class="go">  --enable-dynamic-pairlist</span>
 <span class="go">                        Enables dynamic pairlist refreshes in backtesting. The</span>
 <span class="go">                        pairlist will be generated for each new candle if</span>
-<span class="go">                        you&#39;re using a pairlist handler that supports this</span>
+<span class="go">                        you're using a pairlist handler that supports this</span>
 <span class="go">                        feature, for example, ShuffleFilter.</span>
 <span class="go">  --dry-run-wallet, --starting-balance DRY_RUN_WALLET</span>
 <span class="go">                        Starting balance, used for backtesting / hyperopt and</span>
@@ -2143,9 +2145,9 @@ As the analysis can run for a while, it is executed as a background task.</p>
 <span class="go">                        useful if you are redirecting output to a file.</span>
 <span class="go">  --logfile, --log-file FILE</span>
 <span class="go">                        Log to the file specified. Special values are:</span>
-<span class="go">                        &#39;syslog&#39;, &#39;journald&#39;. See the documentation for more</span>
+<span class="go">                        'syslog', 'journald'. See the documentation for more</span>
 <span class="go">                        details.</span>
-<span class="go">  -V, --version         show program&#39;s version number and exit</span>
+<span class="go">  -V, --version         show program's version number and exit</span>
 <span class="go">  -c, --config PATH     Specify configuration file (default:</span>
 <span class="go">                        `userdir/config.json` or `config.json` whichever</span>
 <span class="go">                        exists). Multiple --config options may be used. Can be</span>
@@ -2183,7 +2185,7 @@ If the programmer is not careful or oblivious how things work internally
 <p>It will start with a backtest of all pairs to generate a baseline for indicators and entries/exits.
 After this initial backtest runs, it will look if the <code>minimum-trade-amount</code> is met and if not cancel the lookahead-analysis for this strategy.<br />
 If this happens, use a wider timerange to get more trades for the analysis, or use a timerange where more trades occur.</p>
-<p>After setting the baseline it will then do additional backtest runs for every entry and exit separately.<br />
+<p>After setting the baseline it will then do additional backtest runs for every entry and exit separately, with a pairlist of length 1.<br />
 When these verification backtests complete, it will compare both dataframes (baseline and sliced) for any difference in columns' value and report the bias.
 After all signals have been verified or falsified a result table will be generated for the user to see.</p>
 <h3 id="how-to-find-and-remove-bias-how-can-i-salvage-a-biased-strategy">How to find and remove bias? How can I salvage a biased strategy?<a class="headerlink" href="#how-to-find-and-remove-bias-how-can-i-salvage-a-biased-strategy" title="Permanent link">&para;</a></h3>
@@ -2228,7 +2230,10 @@ This would lead to a false-negative, i.e. the strategy will be reported as non-b
 Please don't use any options like enabling position stacking as this will distort the number of checked signals.
 If you decide to do so, then make doubly sure that you won't ever run out of <code>max_open_trades</code> slots,
 and that you have enough capital in the backtest wallet configuration.</li>
-<li>limit orders in combination with <code>custom_entry_price()</code> and <code>custom_exit_price()</code> callbacks can cause late / delayed entries and exists, causing false positives.
+<li><code>lookahead-analysis</code> assumes that backtesting a single pair behaves identically to backtesting the full pairlist, as the verification runs use a pairlist containing only the pair being verified.
+Strategies that behave differently depending on the pairlist will therefore be reported as biased (false positive) - for example a <code>leverage()</code> or <code>custom_stake_amount()</code> callback using <code>len(self.dp.current_whitelist())</code>, or <code>populate_*</code> methods that rank against other pairs.
+This applies to every strategy method, not just the ones listed here.</li>
+<li>limit orders in combination with <code>custom_entry_price()</code> and <code>custom_exit_price()</code> callbacks can cause late / delayed entries and exits, causing false positives.
 To avoid this - market orders are forced for this command. This implicitly means that <code>custom_entry_price()</code> and <code>custom_exit_price()</code> callbacks are not called.
 Using <code>--lookahead-allow-limit-orders</code> will skip the override and use your configured order types - however has shown to eventually produce false positives.</li>
 <li>In the results table, the <code>biased_indicators</code> column
